@@ -1,4 +1,7 @@
 ﻿using EmployeeManagement.Business;
+using EmployeeManagement.Business.EventArguments;
+using EmployeeManagement.Business.Exceptions;
+using EmployeeManagement.DataAccess.Entities;
 using EmployeeManagement.Services.Test;
 
 namespace EmployeeManagement.Test
@@ -62,6 +65,45 @@ namespace EmployeeManagement.Test
             //    Assert.False(course.IsNew);
             //}
             Assert.All(internalEmployee.AttendedCourses, course => Assert.False(course.IsNew));
+        }
+        [Fact]
+        public async Task CreateInternalEmployeeAsync_InternalEmployeeCreates_MustHaveAttendedObligatoryCourse_AttendedCourseMustMatchWithObligatoryCourses()
+        {
+            //Arrange
+            var employeeManagementTestDataRepository = new EmployeeManagementTestDataRepository();
+            var employeeSerice = new EmployeeService(employeeManagementTestDataRepository, new EmployeeFactory());
+            var obligatoryCourses = await employeeManagementTestDataRepository.GetCoursesAsync(Guid.Parse("37e03ca7-c730-4351-834c-b66f280cdb01"), Guid.Parse("1fd115cf-f44c-4982-86bc-a8fe2e4ff83e"));
+
+            //Act
+            var internalEmployee = await employeeSerice.CreateInternalEmployeeAsync("Sam", "John");
+
+            //Assert
+            Assert.Equal(obligatoryCourses, internalEmployee.AttendedCourses);
+        }
+
+        [Fact]
+        public async Task GiveRaise_RaiseBelowMinimumGive_MustThrowInvaildRaiseException()
+        {
+            //Arrange
+            var employeeSerice = new EmployeeService(new EmployeeManagementTestDataRepository(), new EmployeeFactory());
+            var internalEmployee = new InternalEmployee("Sam", "John", 5, 3000, false, 1);
+
+            //Act & Assert
+            await Assert.ThrowsAsync<EmployeeInvalidRaiseException>(
+               async () => await employeeSerice.GiveRaiseAsync(internalEmployee, 50));
+        }
+        [Fact]
+        public void NotifyOfAbsence_EmployeeIsAbsent_OnEmployeeIsAbsentMustBeTriggered()
+        {
+            //Arrange
+            var employeeSerice = new EmployeeService(new EmployeeManagementTestDataRepository(), new EmployeeFactory());
+            var internalEmployee = new InternalEmployee("Sam", "John", 5, 3000, false, 1);
+
+            //Act & Assert
+            Assert.Raises<EmployeeIsAbsentEventArgs>(
+                handler => employeeSerice.EmployeeIsAbsent += handler,
+                handler => employeeSerice.EmployeeIsAbsent -= handler,
+                () => employeeSerice.NotifyOfAbsence(internalEmployee));
         }
     }
 }
